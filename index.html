@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>3分で内容が変わるデモ</title>
+  <style>
+    :root{--bg:#0f172a;--card:#0b1220;--accent:#7c3aed;--muted:#93c5fd}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,'Hiragino Kaku Gothic ProN',"Helvetica Neue",Arial}
+    body{background:linear-gradient(180deg,var(--bg) 0%, #071022 100%);display:flex;align-items:center;justify-content:center;color:#e6eef8}
+    .wrap{width:920px;max-width:95%;padding:28px;border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));box-shadow:0 8px 30px rgba(2,6,23,0.6)}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    h1{font-size:20px;margin:0}
+    .meta{font-size:13px;color:#b6c7e6;opacity:.9}
+
+    .card{background:var(--card);padding:20px;border-radius:12px;display:grid;grid-template-columns:1fr 260px;gap:18px;align-items:center}
+    .content{min-height:180px;border-radius:10px;padding:18px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)}
+    .state-title{font-size:18px;margin:0 0 8px}
+    .state-body{color:#cfe6ff;line-height:1.55}
+
+    .sidebar{display:flex;flex-direction:column;gap:12px}
+    .timer{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);padding:12px;border-radius:10px;text-align:center}
+    .count{font-size:28px;font-weight:700}
+    .label{font-size:12px;color:#9fbff0;margin-top:6px}
+
+    .progress-wrap{height:12px;background:rgba(255,255,255,0.03);border-radius:12px;overflow:hidden}
+    .progress{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#2563eb);transition:width 300ms linear}
+
+    .controls{display:flex;gap:8px;margin-top:8px}
+    button{background:transparent;border:1px solid rgba(255,255,255,0.07);padding:8px 10px;border-radius:10px;color:inherit;cursor:pointer}
+    button.primary{background:var(--accent);border-color:transparent;color:white}
+
+    .muted{font-size:12px;color:#9fbff0}
+
+    footer{margin-top:14px;font-size:12px;color:#93c5fd;opacity:0.9}
+
+    /* 状態Bの装飾 */
+    .state-b{background:linear-gradient(135deg,#05233a, #04243a);border-radius:10px;padding:18px}
+  .big-timer{font-size:48px;text-align:center;margin-bottom:20px;font-weight:600;color:#e6eef8}
+.clock{font-size:14px;text-align:right;color:#9fbff0;margin-top:6px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>3分で内容が変わるページ（デモ）</h1>
+      <div class="meta">自動で切り替わります — タイマーはタブ非表示でも正確に判定します</div>
+    </header>
+
+    <div class="card">
+      <div class="content">
+        <div id="bigTimer" class="big-timer">01:00</div>
+        <div id="stateA">
+          <h2 class="state-title">State A — ようこそ</h2>
+          <p class="state-body">このページは最初の状態です。ここではプロモーション情報やイントロを表示できます。<br>1分（60秒）経過すると表示が自動で切り替わり、別のメッセージやレイアウトに変わります。</p>
+        </div>
+
+        <div id="stateB" style="display:none">
+          <div class="state-b">
+            <h2 class="state-title">State B — 内容が更新されました</h2>
+            <p class="state-body">おめでとうございます！1分が経過したため内容が切り替わりました。ここには別のキャンペーン情報や注意書き、特典などを表示できます。</p>
+          </div>
+        </div>
+      </div>
+
+      <aside class="sidebar">
+        <div class="timer">
+          <div id="count" class="count">03:00</div>
+          <div class="label">残り時間</div>
+          <div style="height:8px;margin-top:12px" class="progress-wrap" aria-hidden="true">
+            <div id="progress" class="progress"></div>
+          </div>
+          <div class="controls">
+            <button id="pauseBtn">一時停止</button>
+            <button id="resetBtn" class="primary">リセット</button>
+          </div>
+        </div>
+        <div class="muted">開始時刻: <span id="startAt">--:--:--</span></div>
+        <div class="muted">状態: <strong id="statusText">State A</strong></div>
+      </aside>
+    </div>
+
+    <div class="clock" id="clockNow">--:--:--</div>
+    <footer>※ タブを切り替えても、システムクロックを使って正確に3分後を判定します。</footer>
+  </div>
+
+  <script>
+    (function(){
+      // 設定（ミリ秒）
+      const DURATION_MS = 1 * 30 * 1000; // 3分
+
+      // 要素
+      const countEl = document.getElementById('count');
+      const progressEl = document.getElementById('progress');
+      const startAtEl = document.getElementById('startAt');
+      const statusText = document.getElementById('statusText');
+      const stateA = document.getElementById('stateA');
+      const stateB = document.getElementById('stateB');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const resetBtn = document.getElementById('resetBtn');
+
+      // 内部状態
+      let startTime = null; // Date.now() で保持
+      let paused = false;
+      let pauseUntil = 0; // pause中に経過を補正するためのオフセット
+      let tickId = null;
+
+      function formatTime(ms){
+        const total = Math.max(0, Math.ceil(ms/1000));
+        const m = Math.floor(total/60).toString().padStart(2,'0');
+        const s = (total%60).toString().padStart(2,'0');
+        return `${m}:${s}`;
+      }
+
+      function updateUI(remaining){
+        countEl.textContent = formatTime(remaining);
+        const pct = Math.min(1, Math.max(0, (DURATION_MS - remaining) / DURATION_MS));
+        progressEl.style.width = (pct*100) + '%';
+      }
+
+      function showStateB(){
+        stateA.style.display = 'none';
+        stateB.style.display = 'block';
+        statusText.textContent = 'State B';
+      }
+
+      function showStateA(){
+        stateA.style.display = 'block';
+        stateB.style.display = 'none';
+        statusText.textContent = 'State A';
+      }
+
+      function startTimer(){
+        startTime = Date.now();
+        pauseUntil = 0;
+        paused = false;
+        startAtEl.textContent = new Date(startTime).toLocaleTimeString();
+        pauseBtn.textContent = '一時停止';
+        showStateA();
+        scheduleTick();
+      }
+
+      function scheduleTick(){
+        if(tickId) cancelAnimationFrame(tickId);
+        // アニメーションフレームで素早くポーリング（タブがバックグラウンドでも後で補正）
+        function tick(){
+          if(paused){
+            tickId = requestAnimationFrame(tick);
+            return;
+          }
+          const now = Date.now();
+          const elapsed = now - startTime - pauseUntil;
+          const remaining = Math.max(0, DURATION_MS - elapsed);
+          updateUI(remaining);
+
+          if(elapsed >= DURATION_MS){
+            // 切り替え
+            showStateB();
+            // 通知
+            if ("Notification" in window) {
+              if (Notification.permission === "granted") {
+                new Notification("時間になりました！", { body: "3分が経過しました。" });
+              } else if (Notification.permission !== "denied") {
+                Notification.requestPermission().then(p => {
+                  if (p === "granted") new Notification("時間になりました！", { body: "3分が経過しました。" });
+                });
+              }
+            }
+            cancelAnimationFrame(tickId);
+            tickId = null;
+            return;
+          }
+          // 1秒ごとに時間表記が更新されるようにする
+          tickId = requestAnimationFrame(tick);
+        }
+        tickId = requestAnimationFrame(tick);
+      }
+
+      // pause/resume 実装
+      let pauseStart = 0;
+      pauseBtn.addEventListener('click', ()=>{
+        if(!startTime) return;
+        if(!paused){
+          // pause
+          paused = true;
+          pauseStart = Date.now();
+          pauseBtn.textContent = '再開';
+        } else {
+          // resume
+          paused = false;
+          const pausedFor = Date.now() - pauseStart;
+          pauseUntil += pausedFor;
+          pauseBtn.textContent = '一時停止';
+        }
+      });
+
+      resetBtn.addEventListener('click', ()=>{
+        // リセット: 再スタート
+        if(tickId){
+          cancelAnimationFrame(tickId);
+          tickId = null;
+        }
+        startTimer();
+      });
+
+      // visibilitychange のときにも UI を即時更新しておく
+      document.addEventListener('visibilitychange', ()=>{
+        if(!startTime) return;
+        const now = Date.now();
+        const elapsed = now - startTime - pauseUntil;
+        const remaining = Math.max(0, DURATION_MS - elapsed);
+        updateUI(remaining);
+        if(elapsed >= DURATION_MS){
+          showStateB();
+          if(tickId){ cancelAnimationFrame(tickId); tickId = null; }
+        }
+      });
+
+      // 現在時刻表示
+      function updateClock(){
+        document.getElementById('clockNow').textContent = new Date().toLocaleTimeString();
+      }
+      setInterval(updateClock,1000);
+      updateClock();
+
+      // 初期起動
+      startTimer();
+
+      // ページを再読み込みしても誤差を残さないよう、beforeunload に保存しておく（オプション）
+      // ここでは sessionStorage に開始時刻を入れておく
+      window.addEventListener('beforeunload', ()=>{
+        if(startTime) sessionStorage.setItem('demo_start_at', String(startTime));
+        sessionStorage.setItem('demo_pause_until', String(pauseUntil));
+        sessionStorage.setItem('demo_paused', String(paused));
+      });
+
+      // 読み込み時に sessionStorage があれば復元
+      window.addEventListener('load', ()=>{
+        const saved = sessionStorage.getItem('demo_start_at');
+        if(saved){
+          const s = Number(saved);
+          if(!Number.isNaN(s)){
+            startTime = s;
+            pauseUntil = Number(sessionStorage.getItem('demo_pause_until') || '0');
+            paused = (sessionStorage.getItem('demo_paused') === 'true');
+            startAtEl.textContent = new Date(startTime).toLocaleTimeString();
+            if(paused) pauseBtn.textContent = '再開';
+            scheduleTick();
+            return;
+          }
+        }
+        // なければ通常開始
+        startTimer();
+      });
+
+    })();
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
