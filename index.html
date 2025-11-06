@@ -38,6 +38,13 @@
     .state-b{background:linear-gradient(135deg,#05233a, #04243a);border-radius:10px;padding:18px}
   .big-timer{font-size:48px;text-align:center;margin-bottom:20px;font-weight:600;color:#e6eef8}
 .clock{font-size:14px;text-align:right;color:#9fbff0;margin-top:6px}
+@media (max-width:600px){
+  .card{grid-template-columns:1fr;}
+  .sidebar{flex-direction:row;justify-content:space-between;align-items:center;}
+  .count{font-size:22px;}
+  .big-timer{font-size:36px;}
+  body{padding:12px;}
+}
 </style>
 </head>
 <body>
@@ -49,16 +56,16 @@
 
     <div class="card">
       <div class="content">
-        <div id="bigTimer" class="big-timer">01:00</div>
+        <div id="bigTimer" class="big-timer">03:00</div>
         <div id="stateA">
           <h2 class="state-title">State A — ようこそ</h2>
-          <p class="state-body">このページは最初の状態です。ここではプロモーション情報やイントロを表示できます。<br>1分（60秒）経過すると表示が自動で切り替わり、別のメッセージやレイアウトに変わります。</p>
+          <p class="state-body">このページは最初の状態です。ここではプロモーション情報やイントロを表示できます。<br>3分（180秒）経過すると表示が自動で切り替わり、別のメッセージやレイアウトに変わります。</p>
         </div>
 
         <div id="stateB" style="display:none">
           <div class="state-b">
             <h2 class="state-title">State B — 内容が更新されました</h2>
-            <p class="state-body">おめでとうございます！1分が経過したため内容が切り替わりました。ここには別のキャンペーン情報や注意書き、特典などを表示できます。</p>
+            <p class="state-body">おめでとうございます！3分が経過したため内容が切り替わりました。ここには別のキャンペーン情報や注意書き、特典などを表示できます。</p>
           </div>
         </div>
       </div>
@@ -87,7 +94,7 @@
   <script>
     (function(){
       // 設定（ミリ秒）
-      const DURATION_MS = 1 * 30 * 1000; // 3分
+      const DURATION_MS = 3 * 60 * 1000; // 3分
 
       // 要素
       const countEl = document.getElementById('count');
@@ -159,7 +166,9 @@
             // 通知
             if ("Notification" in window) {
               if (Notification.permission === "granted") {
-                new Notification("時間になりました！", { body: "3分が経過しました。" });
+                // バイブレーション
+if (navigator.vibrate) navigator.vibrate([200,100,200]);
+new Notification("時間になりました！", { body: "3分が経過しました。" });
               } else if (Notification.permission !== "denied") {
                 Notification.requestPermission().then(p => {
                   if (p === "granted") new Notification("時間になりました！", { body: "3分が経過しました。" });
@@ -257,11 +266,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
